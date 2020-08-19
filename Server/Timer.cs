@@ -34,8 +34,10 @@ namespace Server
         private long m_Expiration; /* The time at which this timer will next expire, in ticks */
         private long m_Delay; /* Relative delay until first expiry, in ticks */
         private long m_Interval; /* Relative delay between subsequent expiries, in ticks */
+        private bool m_Running; /* Whether the timer is currently scheduled */
         private bool m_Reschedule; /* Whether to reschedule the timer when it expires */
         private int m_Count; /* The number of times to reschedule the timer automatically */
+        private TimerPriority m_Priority; /* Priority is no longer used and only remains for API compatibility */
 
         /* A pointer to the next timer in the current time wheel bin. Only
 		 * intended to be used by the HierarchicalTimeWheel */
@@ -74,10 +76,20 @@ namespace Server
             m_TimeWheel.Expire();
         }
 
-        /* Timers no longer have priority. To avoid removing the priority system,
-		* just fake it.
-		*/
-        public TimerPriority Priority { get; set; } /* Priority is no longer used and only remains for API compatibility */
+        public TimerPriority Priority
+        {
+            /* Timers no longer have priority. To avoid removing the priority system,
+			 * just fake it.
+			 */
+            get
+            {
+                return m_Priority;
+            }
+            set
+            {
+                m_Priority = value;
+            }
+        }
 
         public TimeSpan Remaining
         {
@@ -125,7 +137,10 @@ namespace Server
             }
         }
 
-        public bool Running { get; set; } /* Whether the timer is currently scheduled */
+        public bool Running
+        {
+            get { return m_Running; }
+        }
 
         public class HierarchicalTimeWheel
         {
@@ -288,7 +303,7 @@ namespace Server
             m_Delay = (DelayInMs * Core.HW_TICKS_PER_MILLISECOND) >> Core.HW_TICKS_PER_ENGINE_TICK_POW_2;
             m_Interval = (IntervalInMs * Core.HW_TICKS_PER_MILLISECOND) >> Core.HW_TICKS_PER_ENGINE_TICK_POW_2;
             m_Count = count;
-            Running = false;
+            m_Running = false;
 
             if (IntervalInMs > 0)
             {
@@ -307,7 +322,7 @@ namespace Server
 
         private void Expire()
         {
-            Running = false;
+            m_Running = false;
             OnTick();
 
             if (m_Reschedule)
@@ -492,109 +507,121 @@ namespace Server
         #region DelayCall Timers
         private class DelayCallTimer : Timer
         {
-            public TimerCallback Callback { get; }
+            private TimerCallback m_Callback;
+
+            public TimerCallback Callback { get { return m_Callback; } }
 
             public DelayCallTimer(TimeSpan delay, TimeSpan interval, int count, TimerCallback callback) : base(delay, interval, count)
             {
-                Callback = callback;
+                m_Callback = callback;
             }
 
             protected override void OnTick()
             {
-                Callback?.Invoke();
+                if (m_Callback != null)
+                    m_Callback();
             }
 
             public override string ToString()
             {
-                return string.Format("DelayCallTimer[{0}]", FormatDelegate(Callback));
+                return string.Format("DelayCallTimer[{0}]", FormatDelegate(m_Callback));
             }
         }
 
         private class DelayStateCallTimer : Timer
         {
-            private readonly object m_State;
+            private TimerStateCallback m_Callback;
+            private object m_State;
 
-            public TimerStateCallback Callback { get; }
+            public TimerStateCallback Callback { get { return m_Callback; } }
 
             public DelayStateCallTimer(TimeSpan delay, TimeSpan interval, int count, TimerStateCallback callback, object state) : base(delay, interval, count)
             {
-                Callback = callback;
+                m_Callback = callback;
                 m_State = state;
             }
 
             protected override void OnTick()
             {
-                Callback?.Invoke(m_State);
+                if (m_Callback != null)
+                    m_Callback(m_State);
             }
 
             public override string ToString()
             {
-                return string.Format("DelayStateCall[{0}]", FormatDelegate(Callback));
+                return string.Format("DelayStateCall[{0}]", FormatDelegate(m_Callback));
             }
         }
 
         private class DelayStateCallTimer<T> : Timer
         {
-            private readonly T m_State;
+            private TimerStateCallback<T> m_Callback;
+            private T m_State;
 
-            public TimerStateCallback<T> Callback { get; }
+            public TimerStateCallback<T> Callback { get { return m_Callback; } }
 
             public DelayStateCallTimer(TimeSpan delay, TimeSpan interval, int count, TimerStateCallback<T> callback, T state)
                 : base(delay, interval, count)
             {
-                Callback = callback;
+                m_Callback = callback;
                 m_State = state;
             }
 
             protected override void OnTick()
             {
-                Callback?.Invoke(m_State);
+                if (m_Callback != null)
+                    m_Callback(m_State);
             }
 
             public override string ToString()
             {
-                return string.Format("DelayStateCall[{0}]", FormatDelegate(Callback));
+                return string.Format("DelayStateCall[{0}]", FormatDelegate(m_Callback));
             }
         }
 
         private class DelayStateCallTimer<T1, T2> : Timer
         {
+            private readonly TimerStateCallback<T1, T2> m_Callback;
             private readonly T1 m_State1;
             private readonly T2 m_State2;
 
-            public TimerStateCallback<T1, T2> Callback { get; }
+            public TimerStateCallback<T1, T2> Callback => m_Callback;
 
             public DelayStateCallTimer(TimeSpan delay, TimeSpan interval, int count, TimerStateCallback<T1, T2> callback, T1 state1, T2 state2)
                 : base(delay, interval, count)
             {
-                Callback = callback;
+                m_Callback = callback;
                 m_State1 = state1;
                 m_State2 = state2;
             }
 
             protected override void OnTick()
             {
-                Callback?.Invoke(m_State1, m_State2);
+                if (m_Callback != null)
+                {
+                    m_Callback(m_State1, m_State2);
+                }
             }
 
             public override string ToString()
             {
-                return string.Format("DelayStateCall[{0}]", FormatDelegate(Callback));
+                return string.Format("DelayStateCall[{0}]", FormatDelegate(m_Callback));
             }
         }
 
         private class DelayStateCallTimer<T1, T2, T3> : Timer
         {
+            private readonly TimerStateCallback<T1, T2, T3> m_Callback;
             private readonly T1 m_State1;
             private readonly T2 m_State2;
             private readonly T3 m_State3;
 
-            public TimerStateCallback<T1, T2, T3> Callback { get; }
+            public TimerStateCallback<T1, T2, T3> Callback => m_Callback;
 
             public DelayStateCallTimer(TimeSpan delay, TimeSpan interval, int count, TimerStateCallback<T1, T2, T3> callback, T1 state1, T2 state2, T3 state3)
                 : base(delay, interval, count)
             {
-                Callback = callback;
+                m_Callback = callback;
                 m_State1 = state1;
                 m_State2 = state2;
                 m_State3 = state3;
@@ -602,28 +629,32 @@ namespace Server
 
             protected override void OnTick()
             {
-                Callback?.Invoke(m_State1, m_State2, m_State3);
+                if (m_Callback != null)
+                {
+                    m_Callback(m_State1, m_State2, m_State3);
+                }
             }
 
             public override string ToString()
             {
-                return string.Format("DelayStateCall[{0}]", FormatDelegate(Callback));
+                return string.Format("DelayStateCall[{0}]", FormatDelegate(m_Callback));
             }
         }
 
         private class DelayStateCallTimer<T1, T2, T3, T4> : Timer
         {
+            private readonly TimerStateCallback<T1, T2, T3, T4> m_Callback;
             private readonly T1 m_State1;
             private readonly T2 m_State2;
             private readonly T3 m_State3;
             private readonly T4 m_State4;
 
-            public TimerStateCallback<T1, T2, T3, T4> Callback { get; }
+            public TimerStateCallback<T1, T2, T3, T4> Callback => m_Callback;
 
             public DelayStateCallTimer(TimeSpan delay, TimeSpan interval, int count, TimerStateCallback<T1, T2, T3, T4> callback, T1 state1, T2 state2, T3 state3, T4 state4)
                 : base(delay, interval, count)
             {
-                Callback = callback;
+                m_Callback = callback;
                 m_State1 = state1;
                 m_State2 = state2;
                 m_State3 = state3;
@@ -632,12 +663,15 @@ namespace Server
 
             protected override void OnTick()
             {
-                Callback?.Invoke(m_State1, m_State2, m_State3, m_State4);
+                if (m_Callback != null)
+                {
+                    m_Callback(m_State1, m_State2, m_State3, m_State4);
+                }
             }
 
             public override string ToString()
             {
-                return string.Format("DelayStateCall[{0}]", FormatDelegate(Callback));
+                return string.Format("DelayStateCall[{0}]", FormatDelegate(m_Callback));
             }
         }
         #endregion
@@ -649,7 +683,7 @@ namespace Server
                 return;
             }
 
-            Running = true;
+            m_Running = true;
             m_Expiration = Core.Now + m_Delay;
 
             if (m_Delay > 0)
@@ -664,12 +698,13 @@ namespace Server
 
         public void Stop()
         {
-            if (Running)
+            if (m_Running)
             {
                 m_TimeWheel.Remove(this);
                 m_Expiration = 0;
-                Running = false;
+                m_Running = false;
             }
+
             m_Reschedule = false;
         }
 

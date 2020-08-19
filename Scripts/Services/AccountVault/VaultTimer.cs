@@ -10,7 +10,7 @@ namespace Server.AccountVault
 
         public static void Initialize()
         {
-            StartTimer();
+            //StartTimer();
         }
 
         public static void OnTick()
