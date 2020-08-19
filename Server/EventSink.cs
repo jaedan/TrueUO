@@ -102,6 +102,8 @@ namespace Server
 
     public delegate void ServerStartedEventHandler();
 
+    public delegate void TimerStartedEventHandler();
+
     public delegate void CreateGuildHandler(CreateGuildEventArgs e);
 
     public delegate void GuildGumpRequestHandler(GuildGumpRequestArgs e);
@@ -1734,6 +1736,7 @@ namespace Server
         public static event FastWalkEventHandler FastWalk;
         public static event CreateGuildHandler CreateGuild;
         public static event ServerStartedEventHandler ServerStarted;
+        public static event TimerStartedEventHandler TimerStarted;
         public static event GuildGumpRequestHandler GuildGumpRequest;
         public static event QuestGumpRequestHandler QuestGumpRequest;
         public static event ClientVersionReceivedHandler ClientVersionReceived;
@@ -1836,6 +1839,14 @@ namespace Server
             if (ServerStarted != null)
             {
                 ServerStarted();
+            }
+        }
+
+        public static void InvokeTimerStarted()
+        {
+            if (TimerStarted != null)
+            {
+                TimerStarted();
             }
         }
 

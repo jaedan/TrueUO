@@ -585,6 +585,8 @@ namespace Server
             EventSink.InvokeServerStarted();
 
             Run();
+
+            EventSink.InvokeTimerStarted();
         }
 
         private static void Run()

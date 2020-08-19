@@ -10,7 +10,10 @@ namespace Server.AccountVault
 
         public static void Initialize()
         {
-            //StartTimer();
+            EventSink.TimerStarted += () =>
+            {
+                StartTimer();
+            };
         }
 
         public static void OnTick()
