@@ -22,7 +22,10 @@ namespace Server.Items
                 _ToothAches[m].Acidity += acidity;
             }
 
-            //_ToothAches[m].Running = true;
+            if (!_ToothAches[m].Running)
+            {
+                _ToothAches[m].Start();
+            }
 
             return _ToothAches[m];
         }
